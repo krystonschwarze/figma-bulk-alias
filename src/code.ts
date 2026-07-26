@@ -16,6 +16,7 @@ import { byLeaf, groupOf, groupsOf, match, naturalCompare } from './pairing.ts';
 import {
   isAlias,
   readSourceVariables,
+  probeLibraries,
   readSources,
   readTargets,
   resolveSource,
@@ -249,6 +250,10 @@ async function handleMessage(message: UiMessage): Promise<void> {
       send({ type: 'target-groups', groups: groupsOf(variables) });
       return;
     }
+
+    case 'probe-libraries':
+      send({ type: 'library-probe', results: await probeLibraries() });
+      return;
 
     case 'plan-link':
       send({ type: 'link-plan', plan: await planLink(message.request) });

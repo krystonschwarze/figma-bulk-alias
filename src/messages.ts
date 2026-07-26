@@ -79,6 +79,13 @@ export interface UnlinkPlan {
   modes: ModeUnlinkPlan[];
 }
 
+export interface LibraryProbe {
+  name: string;
+  libraryName: string | null;
+  count: number;
+  error: string | null;
+}
+
 export interface Outcome {
   applied: number;
   skipped: number;
@@ -88,6 +95,7 @@ export interface Outcome {
 export type UiMessage =
   | { type: 'reload' }
   | { type: 'load-source-groups'; source: SourceCollection }
+  | { type: 'probe-libraries' }
   | { type: 'load-target-groups'; collectionId: string }
   | { type: 'plan-link'; request: LinkRequest }
   | { type: 'apply-link'; request: LinkRequest; keys: string[] }
@@ -102,6 +110,7 @@ export type PluginMessage =
       libraryError: string | null;
     }
   | { type: 'source-groups'; groups: string[]; variableCount: number; rootCount: number }
+  | { type: 'library-probe'; results: LibraryProbe[] }
   | { type: 'target-groups'; groups: string[] }
   | { type: 'link-plan'; plan: LinkPlan }
   | { type: 'unlink-plan'; plan: UnlinkPlan }

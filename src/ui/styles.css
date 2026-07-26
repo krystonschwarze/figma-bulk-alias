@@ -89,3 +89,33 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+.probe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 132px;
+  margin-top: var(--fig-space-1);
+  overflow-y: auto;
+}
+
+.probe {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--fig-font-size-sm);
+}
+
+.probe__name {
+  overflow: hidden;
+  color: var(--fig-text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.probe__count {
+  flex-shrink: 0;
+  color: var(--fig-text);
+  font-variant-numeric: tabular-nums;
+}

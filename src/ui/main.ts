@@ -10,6 +10,7 @@ import {
   showNotice,
 } from '../../ui-kit/kit.ts';
 import type {
+  LibraryProbe,
   LinkPlan,
   LinkRequest,
   ModeAssignment,
@@ -45,6 +46,8 @@ const el = {
   notice: byId('notice'),
   apply: byId<HTMLButtonElement>('apply'),
   reload: byId<HTMLButtonElement>('reload'),
+  probe: byId<HTMLButtonElement>('probe'),
+  probeResults: byId('probeResults'),
 };
 
 const CHECK_SVG =
@@ -139,6 +142,43 @@ function modeCheckbox(mode: ModeInfo): HTMLElement {
   return label;
 }
 
+function syncProbe(): void {
+  const source = currentSource();
+  const empty = sourceGroups.length === 0 && sourceDiagnosis !== '';
+  setVisible(el.probe, operation === 'link' && source?.kind === 'library' && empty);
+}
+
+function renderProbe(results: readonly LibraryProbe[]): void {
+  clear(el.probeResults);
+  const withVariables = results.filter((r) => r.count > 0).length;
+
+  const summary = hint(
+    withVariables === 0
+      ? `All ${results.length} library collections came back empty, so nothing is reaching the plugin from any library.`
+      : `${withVariables} of ${results.length} library collections return variables, so this is specific to the one selected.`,
+  );
+  el.probeResults.appendChild(summary);
+
+  const list = document.createElement('div');
+  list.className = 'probe-list';
+  for (const result of results) {
+    const row = document.createElement('div');
+    row.className = 'probe';
+    const name = document.createElement('span');
+    name.className = 'probe__name';
+    const label =
+      result.libraryName === null ? result.name : `${result.libraryName} · ${result.name}`;
+    name.textContent = label;
+    name.title = label;
+    const count = document.createElement('span');
+    count.className = 'probe__count';
+    count.textContent = result.error !== null ? result.error : `${result.count}`;
+    row.append(name, count);
+    list.appendChild(row);
+  }
+  el.probeResults.appendChild(list);
+}
+
 function syncModeHint(): void {
   const base =
     operation === 'link'
@@ -150,6 +190,7 @@ function syncModeHint(): void {
 function renderModeRows(): void {
   clear(el.modeRows);
   syncModeHint();
+  syncProbe();
   const modes = targetModes();
 
   if (modes.length === 0) {
@@ -405,6 +446,7 @@ const selectOperation = bindSegmented(el.operationSwitch, (value) => {
 el.sourceCollection.addEventListener('change', () => {
   sourceGroups = [];
   sourceDiagnosis = '';
+  clear(el.probeResults);
   renderModeRows();
   const source = currentSource();
   if (source) send({ type: 'load-source-groups', source });
@@ -428,6 +470,12 @@ el.reload.addEventListener('click', () => {
   el.reload.disabled = true;
   setVisible(el.noticeGroup, false);
   send({ type: 'reload' });
+});
+
+el.probe.addEventListener('click', () => {
+  el.probe.disabled = true;
+  el.probe.textContent = 'Checking';
+  send({ type: 'probe-libraries' });
 });
 
 el.toggleAll.addEventListener('click', () => {
@@ -530,6 +578,12 @@ onPluginMessage<PluginMessage>((message) => {
       el.targetGroup.disabled = message.groups.length === 0;
       renderModeRows();
       requestPlan();
+      return;
+
+    case 'library-probe':
+      el.probe.disabled = false;
+      el.probe.textContent = 'Check every library collection';
+      renderProbe(message.results);
       return;
 
     case 'link-plan':

@@ -1,4 +1,4 @@
-import type { SourceCollection, TargetCollection } from './messages.ts';
+import type { LibraryProbe, SourceCollection, TargetCollection } from './messages.ts';
 import type { Pairable } from './pairing.ts';
 
 /*
@@ -106,6 +106,38 @@ export async function resolveSource(variable: SourceVariable): Promise<Variable>
     return local;
   }
   return figma.variables.importVariableByKeyAsync(variable.importKey);
+}
+
+/*
+ * getVariablesInLibraryCollectionAsync can return an empty array without failing, and the docs do not
+ * say when. Asking every enabled library collection at once turns that into an answerable question:
+ * whether nothing comes through at all, or only this one collection is empty.
+ */
+export async function probeLibraries(): Promise<LibraryProbe[]> {
+  const collections = await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
+
+  return Promise.all(
+    collections.map(async (collection) => {
+      try {
+        const variables = await figma.teamLibrary.getVariablesInLibraryCollectionAsync(
+          collection.key,
+        );
+        return {
+          name: collection.name,
+          libraryName: collection.libraryName,
+          count: variables.length,
+          error: null,
+        };
+      } catch (error) {
+        return {
+          name: collection.name,
+          libraryName: collection.libraryName,
+          count: 0,
+          error: error instanceof Error ? error.message : 'failed',
+        };
+      }
+    }),
+  );
 }
 
 export function isAlias(value: VariableValue | undefined): value is VariableAlias {

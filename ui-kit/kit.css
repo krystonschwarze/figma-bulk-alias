@@ -199,12 +199,27 @@ body {
   overflow-y: auto;
 }
 
+/*
+ * Pinned row for a result or an error. Belongs outside fig-body: inside the scrolling area a message
+ * can render below the fold and never be seen, which turns a reported failure into a silent one.
+ */
+.fig-status {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding: var(--fig-space-2) var(--fig-space-2) 0;
+}
+
 .fig-footer {
   display: flex;
   flex-shrink: 0;
   gap: var(--fig-space-2);
   margin-top: auto;
   padding: var(--fig-space-2) var(--fig-space-2) 10px;
+}
+
+/* Only one of the two may claim the leftover space, or the footer stops sitting at the bottom. */
+.fig-status:not([hidden]) + .fig-footer {
+  margin-top: 0;
 }
 
 /* A row footer splits the width evenly, a stacked one keeps every button at full control height. */

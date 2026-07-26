@@ -54,6 +54,7 @@ let operation: Operation = 'link';
 let sources: SourceCollection[] = [];
 let targets: TargetCollection[] = [];
 let sourceGroups: string[] = [];
+let sourceDiagnosis = '';
 let linkPlan: LinkPlan | null = null;
 let unlinkPlan: UnlinkPlan | null = null;
 
@@ -138,8 +139,17 @@ function modeCheckbox(mode: ModeInfo): HTMLElement {
   return label;
 }
 
+function syncModeHint(): void {
+  const base =
+    operation === 'link'
+      ? 'A mode left on Skip is not written. One mode at a time still works.'
+      : 'Aliases are replaced by the concrete value they resolve to.';
+  el.modeHint.textContent = operation === 'link' && sourceDiagnosis !== '' ? sourceDiagnosis : base;
+}
+
 function renderModeRows(): void {
   clear(el.modeRows);
+  syncModeHint();
   const modes = targetModes();
 
   if (modes.length === 0) {
@@ -388,16 +398,13 @@ const selectOperation = bindSegmented(el.operationSwitch, (value) => {
   operation = value as Operation;
   setVisible(el.sourceGroupBox, operation === 'link');
   el.modeLabel.textContent = operation === 'link' ? 'Source group per mode' : 'Modes';
-  el.modeHint.textContent =
-    operation === 'link'
-      ? 'A mode left on Skip is not written. One mode at a time still works.'
-      : 'Aliases are replaced by the concrete value they resolve to.';
   renderModeRows();
   requestPlan();
 });
 
 el.sourceCollection.addEventListener('change', () => {
   sourceGroups = [];
+  sourceDiagnosis = '';
   renderModeRows();
   const source = currentSource();
   if (source) send({ type: 'load-source-groups', source });
@@ -501,6 +508,15 @@ onPluginMessage<PluginMessage>((message) => {
 
     case 'source-groups':
       sourceGroups = message.groups;
+      /* An empty list has three very different causes, so name the one that actually applies. */
+      sourceDiagnosis =
+        message.groups.length > 0
+          ? ''
+          : message.variableCount === 0
+            ? 'This collection returned no variables. If it is a library, check that it is enabled in this file.'
+            : message.rootCount === message.variableCount
+              ? `All ${message.variableCount} variables sit directly in the collection, not in a group. Bulk Alias matches group against group, so there is nothing to pick here.`
+              : `${message.variableCount} variables found but no groups among them.`;
       renderModeRows();
       requestPlan();
       return;
@@ -548,6 +564,5 @@ onPluginMessage<PluginMessage>((message) => {
 selectOperation('link');
 setVisible(el.sourceGroupBox, true);
 el.modeLabel.textContent = 'Source group per mode';
-el.modeHint.textContent = 'A mode left on Skip is not written. One mode at a time still works.';
 renderModeRows();
 renderPreview();

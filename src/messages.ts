@@ -101,7 +101,7 @@ export type PluginMessage =
       targets: TargetCollection[];
       libraryError: string | null;
     }
-  | { type: 'source-groups'; groups: string[] }
+  | { type: 'source-groups'; groups: string[]; variableCount: number; rootCount: number }
   | { type: 'target-groups'; groups: string[] }
   | { type: 'link-plan'; plan: LinkPlan }
   | { type: 'unlink-plan'; plan: UnlinkPlan }

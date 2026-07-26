@@ -39,11 +39,16 @@ export function icon(paths: string, viewBox = '0 0 14 14'): SVGSVGElement {
 
 export type NoticeKind = 'info' | 'success' | 'error';
 
+/**
+ * Errors stay until something replaces them. An error that fades after a few seconds is an error
+ * nobody reads, which is exactly how a failure ends up looking like nothing happened at all.
+ * Pass an explicit timeout to override.
+ */
 export function showNotice(
   el: HTMLElement,
   kind: NoticeKind,
   text: string,
-  timeoutMs = 4000,
+  timeoutMs = kind === 'error' ? 0 : 4000,
 ): void {
   el.className = kind === 'info' ? 'fig-notice' : `fig-notice fig-notice--${kind}`;
   el.textContent = text;

@@ -12,7 +12,7 @@ import type {
   UnlinkPlan,
   UnlinkRequest,
 } from './messages.ts';
-import { byLeaf, groupsOf, match, naturalCompare } from './pairing.ts';
+import { byLeaf, groupOf, groupsOf, match, naturalCompare } from './pairing.ts';
 import {
   isAlias,
   readSourceVariables,
@@ -233,9 +233,16 @@ async function handleMessage(message: UiMessage): Promise<void> {
       await start();
       return;
 
-    case 'load-source-groups':
-      send({ type: 'source-groups', groups: groupsOf(await readSourceVariables(message.source)) });
+    case 'load-source-groups': {
+      const variables = await readSourceVariables(message.source);
+      send({
+        type: 'source-groups',
+        groups: groupsOf(variables),
+        variableCount: variables.length,
+        rootCount: variables.filter((variable) => groupOf(variable.name) === '').length,
+      });
       return;
+    }
 
     case 'load-target-groups': {
       const variables = await targetVariables(message.collectionId);

@@ -1,0 +1,49 @@
+@import "../../ui-kit/kit.css";
+
+.pair-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 132px;
+  margin: 0 calc(-1 * var(--fig-space-1));
+  padding: 0 var(--fig-space-1);
+  overflow-y: auto;
+}
+
+.pair {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  height: 22px;
+}
+
+.pair__leaf {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fig-text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pair__arrow {
+  flex-shrink: 0;
+  color: var(--fig-icon-tertiary);
+}
+
+.pair__target {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--fig-text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+}
+
+.warn-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fig-space-1);
+  margin-top: var(--fig-space-2);
+}

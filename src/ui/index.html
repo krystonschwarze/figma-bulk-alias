@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Bulk Alias</title>
+    <!--inject:css-->
+  </head>
+  <body>
+    <div class="fig-view">
+      <header class="fig-header">
+        <span class="fig-header__dot" aria-hidden="true"></span>
+        <h1 class="fig-header__title">Bulk Alias</h1>
+        <span class="fig-header__meta" id="matchCount"></span>
+      </header>
+
+      <div class="fig-body">
+        <section class="fig-group">
+          <div class="fig-label">Source</div>
+          <select class="fig-select" id="sourceCollection" aria-label="Source collection"></select>
+          <select class="fig-select" id="sourceGroup" aria-label="Source group" disabled></select>
+        </section>
+
+        <section class="fig-group">
+          <div class="fig-label">Target</div>
+          <select class="fig-select" id="targetCollection" aria-label="Target collection"></select>
+          <select class="fig-select" id="targetGroup" aria-label="Target group" disabled></select>
+          <select class="fig-select" id="mode" aria-label="Target mode" disabled></select>
+        </section>
+
+        <section class="fig-group">
+          <div class="fig-label">Preview</div>
+          <div id="previewBody">
+            <p class="fig-hint" id="previewHint">Pick a source group and a target group.</p>
+          </div>
+        </section>
+
+        <section class="fig-group" id="noticeGroup" hidden>
+          <div class="fig-notice" id="notice"></div>
+        </section>
+      </div>
+
+      <footer class="fig-footer fig-footer--stack">
+        <button type="button" class="fig-btn fig-btn--primary" id="create" disabled>
+          Create aliases
+        </button>
+        <button type="button" class="fig-btn" id="remove" disabled>Remove aliases</button>
+      </footer>
+    </div>
+
+    <!--inject:js-->
+  </body>
+</html>

@@ -1,40 +1,48 @@
-Below are the steps to get your plugin running. You can also find instructions at:
+# Bulk Alias
 
-  https://www.figma.com/plugin-docs/plugin-quickstart-guide/
+Figma plugin that points a whole set of variables at another set in one step, and unlinks them again.
+The typical use is wiring a semantic collection to its primitives without clicking through every
+variable by hand.
 
-This plugin template uses Typescript and NPM, two standard tools in creating JavaScript applications.
+"Group" here means a folder inside a variable collection, the kind Figma creates from the slashes in a
+variable name, so `color/base/01` sits in the group `color/base`. It has nothing to do with layer
+groups on the canvas.
 
-First, download Node.js which comes with NPM. This will allow you to install TypeScript and other
-libraries. You can find the download link here:
+## What it does
 
-  https://nodejs.org/en/download/
+Pick a source group, a target group and the target mode. Every target variable whose name matches a
+source variable gets an alias pointing at it.
 
-Next, install TypeScript using the command:
+Matching is by **name**, not by position. Two groups can hold the same variables in a different
+order, so the preview lists exactly which pairs will be written before anything happens. Names
+without a counterpart, and pairs whose value types differ, are reported and left untouched.
 
-  npm install -g typescript
+**Remove aliases** writes a concrete value back into every aliased variable of the target group. The
+value is read from the source collection's own default mode, and alias chains are followed to their
+end, because mode ids are not shared between collections.
 
-Finally, in the directory of your plugin, get the latest type definitions for the plugin API by running:
+## Development
 
-  npm install --save-dev @figma/plugin-typings
+```sh
+npm install
+npm run dev      # rebuild dist/ on every change
+npm test         # unit tests for the pure logic, via the Node test runner
+npm run build    # minified production build
+npm run verify   # typecheck, lint, format check, test, build
+```
 
-If you are familiar with JavaScript, TypeScript will look very familiar. In fact, valid JavaScript code
-is already valid Typescript code.
+Import the plugin in Figma via **Plugins > Development > Import plugin from manifest** and pick
+`manifest.json`. The manifest points at `dist/`, so run a build at least once before importing.
 
-TypeScript adds type annotations to variables. This allows code editors such as Visual Studio Code
-to provide information about the Figma API while you are writing code, as well as help catch bugs
-you previously didn't notice.
+## Layout
 
-For more information, visit https://www.typescriptlang.org/
+| Path              | Role                                                             |
+| ----------------- | ---------------------------------------------------------------- |
+| `src/code.ts`     | Sandbox side. Matching, aliasing and unlinking.                  |
+| `src/pairing.ts`  | Group matching by leaf name. Pure, unit tested.                  |
+| `src/messages.ts` | Message contract shared by both sides.                           |
+| `src/ui/`         | Plugin window. `index.html` is a template, the build inlines it. |
+| `ui-kit/`         | Shared design system. Synced copy, do not edit here.             |
 
-Using TypeScript requires a compiler to convert TypeScript (code.ts) into JavaScript (code.js)
-for the browser to run.
-
-We recommend writing TypeScript code using Visual Studio code:
-
-1. Download Visual Studio Code if you haven't already: https://code.visualstudio.com/.
-2. Open this directory in Visual Studio Code.
-3. Compile TypeScript to JavaScript: Run the "Terminal > Run Build Task..." menu item,
-    then select "npm: watch". You will have to do this again every time
-    you reopen Visual Studio Code.
-
-That's it! Visual Studio Code will regenerate the JavaScript file every time you save.
+Run `npm run sync:ui-kit` to pull the latest design system from the repo carrying the
+`.ui-kit-canonical` marker, currently `figma-tidy-sections`.

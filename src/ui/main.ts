@@ -142,6 +142,27 @@ function modeCheckbox(mode: ModeInfo): HTMLElement {
   return label;
 }
 
+/*
+ * An empty group list has several causes that look identical in the UI. The library case is the one
+ * worth spelling out: Figma lists a collection in the library directory even when it publishes no
+ * variables, which is what a collection marked hidden from publishing looks like from here. That is
+ * common for primitives, and no plugin can work around it because Figma exposes published data only.
+ */
+function diagnose(variableCount: number, rootCount: number, groupCount: number): string {
+  if (groupCount > 0) return '';
+
+  const fromLibrary = currentSource()?.kind === 'library';
+  if (variableCount === 0) {
+    return fromLibrary
+      ? 'This library collection publishes no variables. Either it is empty, or it is hidden from publishing in the library file, which is usual for primitives. Figma only hands other files what a library actually publishes, so this cannot be worked around here.'
+      : 'This collection has no variables.';
+  }
+  if (rootCount === variableCount) {
+    return `All ${variableCount} variables sit directly in the collection, not in a group. Bulk Alias matches group against group, so there is nothing to pick here.`;
+  }
+  return `${variableCount} variables found but no groups among them.`;
+}
+
 function syncProbe(): void {
   const source = currentSource();
   const empty = sourceGroups.length === 0 && sourceDiagnosis !== '';
@@ -556,15 +577,7 @@ onPluginMessage<PluginMessage>((message) => {
 
     case 'source-groups':
       sourceGroups = message.groups;
-      /* An empty list has three very different causes, so name the one that actually applies. */
-      sourceDiagnosis =
-        message.groups.length > 0
-          ? ''
-          : message.variableCount === 0
-            ? 'This collection returned no variables. If it is a library, check that it is enabled in this file.'
-            : message.rootCount === message.variableCount
-              ? `All ${message.variableCount} variables sit directly in the collection, not in a group. Bulk Alias matches group against group, so there is nothing to pick here.`
-              : `${message.variableCount} variables found but no groups among them.`;
+      sourceDiagnosis = diagnose(message.variableCount, message.rootCount, message.groups.length);
       renderModeRows();
       requestPlan();
       return;

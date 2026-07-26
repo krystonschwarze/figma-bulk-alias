@@ -42,6 +42,15 @@ someone else's library. Three prerequisites, none of which a plugin can arrange 
    window names both.
 3. The library has to be enabled in the file through the Figma UI. The plugin API cannot enable
    libraries.
+4. The source collection has to **publish** its variables. Figma lists a collection in the library
+   directory even when it publishes nothing, so a collection marked hidden from publishing appears in
+   the picker and then returns no variables. That is common for primitive collections, whose whole
+   point is that consumers should not reach past the semantic layer. Nothing in a plugin can work
+   around it: Figma only hands other files what a library actually publishes.
+
+   When a library collection comes back empty, the window offers **Check every library collection**,
+   which reports the variable count for each one. That distinguishes a broken connection, where every
+   collection reads zero, from a single collection that publishes nothing.
 
 After changing either manifest entry the plugin has to be removed from **Plugins > Development** and
 imported again. Figma records these at import time, so a plain re-run keeps failing even though the

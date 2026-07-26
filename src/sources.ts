@@ -47,7 +47,11 @@ export async function readSources(): Promise<SourceList> {
     }));
   } catch (error) {
     /* A file with no enabled libraries, or no network, must not take the local path down with it. */
-    libraryError = error instanceof Error ? error.message : 'Libraries could not be read.';
+    const detail = error instanceof Error ? error.message : 'Libraries could not be read.';
+    /* figma.teamLibrary is gated behind a manifest permission, and the raw message buries that. */
+    libraryError = detail.includes('permission not specified')
+      ? 'manifest.json is missing "permissions": ["teamlibrary"], so libraries cannot be read.'
+      : detail;
   }
 
   const byName = (a: SourceCollection, b: SourceCollection): number => a.name.localeCompare(b.name);

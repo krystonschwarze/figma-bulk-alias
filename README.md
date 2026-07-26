@@ -34,8 +34,12 @@ as before.
 picker, library entries prefixed with the library name. Library variables are read as descriptors for
 the preview, which costs no imports, and only the pairs you actually apply are pulled in with
 `importVariableByKeyAsync`. Targets are always local, because a plugin cannot write variables into
-someone else's library. A library has to be enabled in the file through the Figma UI first, no plugin
-can do that.
+someone else's library. Two prerequisites that no plugin can arrange for itself:
+
+1. `manifest.json` must carry `"permissions": ["teamlibrary"]`. Without it every
+   `figma.teamLibrary` call fails, and the window reports the missing permission by name.
+2. The library has to be enabled in the file through the Figma UI. The plugin API cannot enable
+   libraries.
 
 **Unlink** replaces an alias with the concrete value it resolves to. The value is read from the source
 collection's own default mode, and alias chains are followed to their end, because mode ids are not

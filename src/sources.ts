@@ -48,9 +48,12 @@ export async function readSources(): Promise<SourceList> {
   } catch (error) {
     /* A file with no enabled libraries, or no network, must not take the local path down with it. */
     const detail = error instanceof Error ? error.message : 'Libraries could not be read.';
-    /* figma.teamLibrary is gated behind a manifest permission, and the raw message buries that. */
+    /*
+     * figma.teamLibrary needs two manifest entries and Figma reports the same message for either
+     * one missing, so name both rather than sending anyone down the wrong path.
+     */
     libraryError = detail.includes('permission not specified')
-      ? 'manifest.json is missing "permissions": ["teamlibrary"], so libraries cannot be read.'
+      ? 'manifest.json needs both "permissions": ["teamlibrary"] and "enableProposedApi": true, and the plugin has to be re-imported afterwards.'
       : detail;
   }
 

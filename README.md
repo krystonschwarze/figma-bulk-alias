@@ -34,12 +34,23 @@ as before.
 picker, library entries prefixed with the library name. Library variables are read as descriptors for
 the preview, which costs no imports, and only the pairs you actually apply are pulled in with
 `importVariableByKeyAsync`. Targets are always local, because a plugin cannot write variables into
-someone else's library. Two prerequisites that no plugin can arrange for itself:
+someone else's library. Three prerequisites, none of which a plugin can arrange for itself:
 
-1. `manifest.json` must carry `"permissions": ["teamlibrary"]`. Without it every
-   `figma.teamLibrary` call fails, and the window reports the missing permission by name.
-2. The library has to be enabled in the file through the Figma UI. The plugin API cannot enable
+1. `manifest.json` must carry `"permissions": ["teamlibrary"]`.
+2. `manifest.json` must carry `"enableProposedApi": true`. `figma.teamLibrary` is a proposed API.
+   Figma reports the same "permission not specified" message when either entry is missing, so the
+   window names both.
+3. The library has to be enabled in the file through the Figma UI. The plugin API cannot enable
    libraries.
+
+After changing either manifest entry the plugin has to be removed from **Plugins > Development** and
+imported again. Figma records these at import time, so a plain re-run keeps failing even though the
+code is current.
+
+**This is why the plugin cannot be published.** Figma is explicit about `enableProposedApi`: "This
+flag is only meant for development, and will not work in published plugins!" Library sources
+therefore work as a development or internal plugin and would silently stop working in a Community
+release. Local collections are unaffected either way.
 
 **Unlink** replaces an alias with the concrete value it resolves to. The value is read from the source
 collection's own default mode, and alias chains are followed to their end, because mode ids are not

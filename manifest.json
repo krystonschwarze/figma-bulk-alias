@@ -5,7 +5,7 @@
   "main": "dist/code.js",
   "ui": "dist/ui.html",
   "capabilities": [],
-  "enableProposedApi": false,
+  "enableProposedApi": true,
   "documentAccess": "dynamic-page",
   "editorType": ["figma"],
   "permissions": ["teamlibrary"],

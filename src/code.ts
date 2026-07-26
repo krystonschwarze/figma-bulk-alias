@@ -12,7 +12,7 @@ import type {
   UnlinkPlan,
   UnlinkRequest,
 } from './messages.ts';
-import { byLeaf, groupsOf, match } from './pairing.ts';
+import { byLeaf, groupsOf, match, naturalCompare } from './pairing.ts';
 import {
   isAlias,
   readSourceVariables,
@@ -156,7 +156,7 @@ async function planUnlink(request: UnlinkRequest): Promise<UnlinkPlan> {
       });
     }
 
-    aliased.sort((a, b) => a.leaf.localeCompare(b.leaf));
+    aliased.sort((a, b) => naturalCompare(a.leaf, b.leaf));
     modes.push({ modeId: mode.id, modeName: mode.name, aliased, plain });
   }
 
@@ -229,6 +229,10 @@ function summarize(outcome: Outcome, operation: Operation): string {
 
 async function handleMessage(message: UiMessage): Promise<void> {
   switch (message.type) {
+    case 'reload':
+      await start();
+      return;
+
     case 'load-source-groups':
       send({ type: 'source-groups', groups: groupsOf(await readSourceVariables(message.source)) });
       return;

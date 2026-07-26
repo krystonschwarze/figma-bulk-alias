@@ -41,6 +41,10 @@ can do that.
 collection's own default mode, and alias chains are followed to their end, because mode ids are not
 shared between collections.
 
+**Reload** in the header re-reads the document without a restart, keeping the collections, the group
+and the per mode assignments that are still valid. A group that was renamed in the meantime falls back
+to Skip rather than keeping a stale value.
+
 **Both operations preview before they write, and every row has a checkbox.** Matching is by name, not
 by position, so two groups holding the same variables in a different order still pair correctly. Names
 without a counterpart, and pairs whose value types differ, are reported and left alone. The write path

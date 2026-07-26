@@ -37,10 +37,30 @@ export function byLeaf<T extends Pairable>(variables: readonly T[], group: strin
   return result;
 }
 
+/* Sorts 1, 2, 10 rather than 1, 10, 2. Variable leaves are numbered far more often than not. */
+export function naturalCompare(a: string, b: string): number {
+  const parts = /(\d+|\D+)/g;
+  const left = a.match(parts) ?? [];
+  const right = b.match(parts) ?? [];
+
+  for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+    const l = left[i] ?? '';
+    const r = right[i] ?? '';
+    if (/^\d+$/.test(l) && /^\d+$/.test(r)) {
+      const diff = Number.parseInt(l, 10) - Number.parseInt(r, 10);
+      if (diff !== 0) return diff;
+      continue;
+    }
+    const diff = l.localeCompare(r);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 export function groupsOf(variables: readonly Pairable[]): string[] {
   const groups = new Set(variables.map((variable) => groupOf(variable.name)));
   groups.delete('');
-  return [...groups].sort((a, b) => a.localeCompare(b));
+  return [...groups].sort(naturalCompare);
 }
 
 /**
@@ -78,12 +98,11 @@ export function match(
   }
 
   const missingInSource = [...target.keys()].filter((leaf) => !source.has(leaf));
-  const alpha = (a: string, b: string): number => a.localeCompare(b);
 
   return {
-    matched: matched.sort((a, b) => alpha(a.leaf, b.leaf)),
-    missingInTarget: missingInTarget.sort(alpha),
-    missingInSource: missingInSource.sort(alpha),
-    typeMismatch: typeMismatch.sort(alpha),
+    matched: matched.sort((a, b) => naturalCompare(a.leaf, b.leaf)),
+    missingInTarget: missingInTarget.sort(naturalCompare),
+    missingInSource: missingInSource.sort(naturalCompare),
+    typeMismatch: typeMismatch.sort(naturalCompare),
   };
 }

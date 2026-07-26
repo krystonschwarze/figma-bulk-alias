@@ -51,25 +51,20 @@
   padding: 0 var(--fig-space-1);
 }
 
+/* Also carries fig-check and fig-check--sm, so the tick matches every other checkbox in the family. */
 .pair {
   display: flex;
   gap: 6px;
   align-items: center;
   height: 22px;
+  padding: 0 var(--fig-space-1);
   border-radius: var(--fig-radius-sm);
+  color: var(--fig-text);
   cursor: pointer;
 }
 
 .pair:hover {
   background: var(--fig-bg-hover);
-}
-
-.pair__box {
-  flex-shrink: 0;
-  width: 12px;
-  height: 12px;
-  margin: 0;
-  accent-color: var(--fig-bg-brand);
 }
 
 .pair__leaf {

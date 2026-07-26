@@ -44,7 +44,11 @@ const el = {
   noticeGroup: byId('noticeGroup'),
   notice: byId('notice'),
   apply: byId<HTMLButtonElement>('apply'),
+  reload: byId<HTMLButtonElement>('reload'),
 };
+
+const CHECK_SVG =
+  '<svg viewBox="0 0 10 10" fill="none"><path d="M2 5.5 4 7.5 8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 let operation: Operation = 'link';
 let sources: SourceCollection[] = [];
@@ -55,6 +59,13 @@ let unlinkPlan: UnlinkPlan | null = null;
 
 /* Which pair keys are ticked. Absent means ticked, so a fresh plan starts fully selected. */
 const unticked = new Set<string>();
+
+/*
+ * The mode rows are rebuilt whenever collections or groups change, so their state cannot live in the
+ * DOM. Keeping it here is what lets Reload re-read the document without losing what was set up.
+ */
+const chosenSourceGroup = new Map<string, string>();
+const skippedModes = new Set<string>();
 
 function send(message: UiMessage): void {
   postToPlugin(message);
@@ -91,7 +102,17 @@ function modeSelect(mode: ModeInfo): HTMLSelectElement {
     'Skip this mode',
     sourceGroups.map((group) => ({ value: group, label: group })),
   );
-  select.addEventListener('change', requestPlan);
+
+  /* Restore only if the group still exists, so a renamed group falls back to Skip instead of lying. */
+  const remembered = chosenSourceGroup.get(mode.id);
+  if (remembered !== undefined && sourceGroups.includes(remembered)) select.value = remembered;
+  else chosenSourceGroup.delete(mode.id);
+
+  select.addEventListener('change', () => {
+    if (select.value === '') chosenSourceGroup.delete(mode.id);
+    else chosenSourceGroup.set(mode.id, select.value);
+    requestPlan();
+  });
   return select;
 }
 
@@ -99,12 +120,21 @@ function modeCheckbox(mode: ModeInfo): HTMLElement {
   const label = document.createElement('label');
   label.className = 'fig-check';
   label.innerHTML =
-    `<input type="checkbox" data-mode-id="${mode.id}" checked />` +
+    `<input type="checkbox" data-mode-id="${mode.id}" />` +
     '<span class="fig-check__box" aria-hidden="true">' +
-    '<svg viewBox="0 0 10 10" fill="none"><path d="M2 5.5 4 7.5 8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    CHECK_SVG +
     '</span>';
   label.append(document.createTextNode(mode.name));
-  label.querySelector('input')?.addEventListener('change', requestPlan);
+
+  const input = label.querySelector('input');
+  if (input) {
+    input.checked = !skippedModes.has(mode.id);
+    input.addEventListener('change', () => {
+      if (input.checked) skippedModes.delete(mode.id);
+      else skippedModes.add(mode.id);
+      requestPlan();
+    });
+  }
   return label;
 }
 
@@ -190,17 +220,21 @@ function requestPlan(): void {
 
 function pairRow(key: string, left: string, right: string): HTMLElement {
   const row = document.createElement('label');
-  row.className = 'pair';
+  row.className = 'pair fig-check fig-check--sm';
 
   const box = document.createElement('input');
   box.type = 'checkbox';
-  box.className = 'pair__box';
   box.checked = !unticked.has(key);
   box.addEventListener('change', () => {
     if (box.checked) unticked.delete(key);
     else unticked.add(key);
     syncApply();
   });
+
+  const mark = document.createElement('span');
+  mark.className = 'fig-check__box';
+  mark.setAttribute('aria-hidden', 'true');
+  mark.innerHTML = CHECK_SVG;
 
   const leaf = document.createElement('span');
   leaf.className = 'pair__leaf';
@@ -216,7 +250,7 @@ function pairRow(key: string, left: string, right: string): HTMLElement {
   target.textContent = right;
   target.title = right;
 
-  row.append(box, leaf, arrow, target);
+  row.append(box, mark, leaf, arrow, target);
   return row;
 }
 
@@ -382,6 +416,13 @@ el.targetCollection.addEventListener('change', () => {
 
 el.targetGroup.addEventListener('change', requestPlan);
 
+/* Re-reads the document without a restart. Every selection is restored if it still exists. */
+el.reload.addEventListener('click', () => {
+  el.reload.disabled = true;
+  setVisible(el.noticeGroup, false);
+  send({ type: 'reload' });
+});
+
 el.toggleAll.addEventListener('click', () => {
   if (selectedKeys().length > 0) for (const key of allKeys()) unticked.add(key);
   else unticked.clear();
@@ -441,6 +482,17 @@ onPluginMessage<PluginMessage>((message) => {
             ? 'No library collections found. Enable a library in this file to alias to it.'
             : `${libraries} library ${libraries === 1 ? 'collection' : 'collections'} available.`;
       setVisible(el.libraryHint, true);
+      el.reload.disabled = false;
+
+      /*
+       * fillSelect keeps a value that still exists, so after a reload the chosen collections survive
+       * and their groups have to be fetched again to rebuild the rows underneath them.
+       */
+      const source = currentSource();
+      if (source) send({ type: 'load-source-groups', source });
+      if (el.targetCollection.value) {
+        send({ type: 'load-target-groups', collectionId: el.targetCollection.value });
+      }
 
       renderModeRows();
       renderPreview();

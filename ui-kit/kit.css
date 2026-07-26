@@ -547,6 +547,28 @@ body {
   opacity: 1;
 }
 
+/*
+ * Row height variant for dense lists. Never swap this for a native checkbox with accent-color: the
+ * browser picks the tick colour from the colour scheme, so it comes out dark in light mode.
+ */
+.fig-check--sm {
+  gap: 0;
+  height: auto;
+  padding: 0;
+}
+
+.fig-check--sm .fig-check__box {
+  width: 12px;
+  height: 12px;
+  border-width: 1px;
+  border-radius: 2px;
+}
+
+.fig-check--sm .fig-check__box svg {
+  width: 8px;
+  height: 8px;
+}
+
 .fig-check input:focus-visible + .fig-check__box {
   outline: 2px solid var(--fig-border-brand);
   outline-offset: 1px;

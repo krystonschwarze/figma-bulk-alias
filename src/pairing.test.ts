@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { pairKey } from './messages.ts';
-import { byLeaf, groupOf, groupsOf, leafOf, match } from './pairing.ts';
+import { byLeaf, groupOf, groupsOf, leafOf, match, naturalCompare } from './pairing.ts';
 import type { Pairable } from './pairing.ts';
 
 function v(id: string, name: string, resolvedType = 'COLOR'): Pairable {
@@ -101,4 +101,47 @@ test('every pair carries a key scoped to its mode', () => {
   assert.equal(light.matched[0]?.key, 'light::01');
   assert.equal(dark.matched[0]?.key, 'dark::01');
   assert.notEqual(light.matched[0]?.key, dark.matched[0]?.key);
+});
+
+test('numbered leaves sort naturally, not alphabetically', () => {
+  const names = ['1', '10', '11', '12', '2', '3', '9'];
+  const source = byLeaf(
+    names.map((n) => v(`s${n}`, `a/${n}`)),
+    'a',
+  );
+  const target = byLeaf(
+    names.map((n) => v(`t${n}`, `b/${n}`)),
+    'b',
+  );
+
+  const result = match(source, target, key);
+
+  assert.deepEqual(
+    result.matched.map((pair) => pair.leaf),
+    ['1', '2', '3', '9', '10', '11', '12'],
+  );
+});
+
+test('naturalCompare handles zero padding and mixed text', () => {
+  assert.deepEqual(['10', '02', '1', '01', '9'].sort(naturalCompare), ['1', '01', '02', '9', '10']);
+  assert.deepEqual(['step-10', 'step-2', 'step-1'].sort(naturalCompare), [
+    'step-1',
+    'step-2',
+    'step-10',
+  ]);
+});
+
+test('the unmatched lists sort naturally too', () => {
+  const source = byLeaf(
+    ['1', '10', '2'].map((n) => v(`s${n}`, `a/${n}`)),
+    'a',
+  );
+  const result = match(source, new Map(), key);
+
+  assert.deepEqual(result.missingInTarget, ['1', '2', '10']);
+});
+
+test('group names sort naturally', () => {
+  const variables = [v('1', 'scale/1000/x'), v('2', 'scale/200/x'), v('3', 'scale/50/x')];
+  assert.deepEqual(groupsOf(variables), ['scale/50', 'scale/200', 'scale/1000']);
 });

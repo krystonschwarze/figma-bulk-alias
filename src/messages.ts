@@ -86,6 +86,7 @@ export interface Outcome {
 }
 
 export type UiMessage =
+  | { type: 'reload' }
   | { type: 'load-source-groups'; source: SourceCollection }
   | { type: 'load-target-groups'; collectionId: string }
   | { type: 'plan-link'; request: LinkRequest }

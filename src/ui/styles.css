@@ -1,13 +1,54 @@
 @import "../../ui-kit/kit.css";
 
+.segment-text {
+  font-weight: 500;
+}
+
+.mode-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mode-row + .mode-row {
+  margin-top: var(--fig-space-1);
+}
+
+.mode-row__name {
+  flex: 0 0 82px;
+  overflow: hidden;
+  color: var(--fig-text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mode-head {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: var(--fig-space-2);
+  color: var(--fig-text);
+  font-weight: 600;
+}
+
+.mode-head:first-child {
+  margin-top: 0;
+}
+
+.mode-head__meta {
+  flex-shrink: 0;
+  color: var(--fig-text-tertiary);
+  font-weight: 400;
+  font-size: var(--fig-font-size-sm);
+}
+
 .pair-list {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  max-height: 132px;
-  margin: 0 calc(-1 * var(--fig-space-1));
+  margin: var(--fig-space-1) calc(-1 * var(--fig-space-1)) 0;
   padding: 0 var(--fig-space-1);
-  overflow-y: auto;
 }
 
 .pair {
@@ -15,13 +56,26 @@
   gap: 6px;
   align-items: center;
   height: 22px;
+  border-radius: var(--fig-radius-sm);
+  cursor: pointer;
+}
+
+.pair:hover {
+  background: var(--fig-bg-hover);
+}
+
+.pair__box {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  accent-color: var(--fig-bg-brand);
 }
 
 .pair__leaf {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--fig-text);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -33,17 +87,10 @@
 
 .pair__target {
   flex-shrink: 0;
-  max-width: 45%;
+  max-width: 48%;
   overflow: hidden;
+  direction: rtl;
   color: var(--fig-text-secondary);
   white-space: nowrap;
   text-overflow: ellipsis;
-  direction: rtl;
-}
-
-.warn-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fig-space-1);
-  margin-top: var(--fig-space-2);
 }

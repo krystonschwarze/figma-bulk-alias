@@ -10,40 +10,82 @@
       <header class="fig-header">
         <span class="fig-header__dot" aria-hidden="true"></span>
         <h1 class="fig-header__title">Bulk Alias</h1>
-        <span class="fig-header__meta" id="matchCount"></span>
+        <span class="fig-header__meta" id="headerMeta"></span>
       </header>
 
+      <div class="fig-toolbar">
+        <div class="fig-segmented" id="operationSwitch" aria-label="Operation">
+          <button class="fig-segment segment-text" data-value="link">Link</button>
+          <button class="fig-segment segment-text" data-value="unlink">Unlink</button>
+        </div>
+      </div>
+
       <div class="fig-body">
-        <section class="fig-group">
-          <div class="fig-label">Source</div>
-          <select class="fig-select" id="sourceCollection" aria-label="Source collection"></select>
-          <select class="fig-select" id="sourceGroup" aria-label="Source group" disabled></select>
-        </section>
+        <div class="fig-empty" id="emptyView" hidden>
+          <svg viewBox="0 0 28 28" fill="none" aria-hidden="true">
+            <rect
+              x="3"
+              y="3"
+              width="22"
+              height="22"
+              rx="5"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-dasharray="3 2.5"
+            />
+            <path d="M10 14h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+          <p class="fig-empty__text">Create a variable collection in this file first.</p>
+        </div>
 
-        <section class="fig-group">
-          <div class="fig-label">Target</div>
-          <select class="fig-select" id="targetCollection" aria-label="Target collection"></select>
-          <select class="fig-select" id="targetGroup" aria-label="Target group" disabled></select>
-          <select class="fig-select" id="mode" aria-label="Target mode" disabled></select>
-        </section>
+        <div class="fig-view" id="mainView" hidden>
+          <section class="fig-group" id="sourceGroupBox">
+            <div class="fig-label">Source</div>
+            <select
+              class="fig-select"
+              id="sourceCollection"
+              aria-label="Source collection"
+            ></select>
+            <p class="fig-hint" id="libraryHint" hidden></p>
+          </section>
 
-        <section class="fig-group">
-          <div class="fig-label">Preview</div>
-          <div id="previewBody">
-            <p class="fig-hint" id="previewHint">Pick a source group and a target group.</p>
-          </div>
-        </section>
+          <section class="fig-group">
+            <div class="fig-label">Target</div>
+            <select
+              class="fig-select"
+              id="targetCollection"
+              aria-label="Target collection"
+            ></select>
+            <select class="fig-select" id="targetGroup" aria-label="Target group" disabled></select>
+          </section>
+
+          <section class="fig-group" id="modeBox">
+            <div class="fig-label-row">
+              <span class="fig-label" id="modeLabel">Modes</span>
+              <span class="fig-hint" id="modeCount"></span>
+            </div>
+            <div id="modeRows"></div>
+            <p class="fig-hint" id="modeHint"></p>
+          </section>
+
+          <section class="fig-group">
+            <div class="fig-label-row">
+              <span class="fig-label">Preview</span>
+              <button type="button" class="fig-link" id="toggleAll" hidden>Deselect all</button>
+            </div>
+            <div id="previewBody"></div>
+          </section>
+        </div>
 
         <section class="fig-group" id="noticeGroup" hidden>
           <div class="fig-notice" id="notice"></div>
         </section>
       </div>
 
-      <footer class="fig-footer fig-footer--stack">
-        <button type="button" class="fig-btn fig-btn--primary" id="create" disabled>
+      <footer class="fig-footer">
+        <button type="button" class="fig-btn fig-btn--primary" id="apply" disabled>
           Create aliases
         </button>
-        <button type="button" class="fig-btn" id="remove" disabled>Remove aliases</button>
       </footer>
     </div>
 

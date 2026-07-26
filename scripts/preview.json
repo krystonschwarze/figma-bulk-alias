@@ -1,0 +1,24 @@
+{
+  "width": 380,
+  "height": 680,
+  "messages": [
+    {
+      "type": "sources",
+      "libraryError": null,
+      "sources": [
+        { "kind": "local", "ref": "c1", "name": "Primitives", "libraryName": null },
+        { "kind": "library", "ref": "libkey1", "name": "Primitives", "libraryName": "Neoskop DS" }
+      ],
+      "targets": [
+        {
+          "id": "c2",
+          "name": "Semantic",
+          "modes": [
+            { "id": "light", "name": "Light" },
+            { "id": "dark", "name": "Dark" }
+          ]
+        }
+      ]
+    }
+  ]
+}

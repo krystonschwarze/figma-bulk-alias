@@ -1,5 +1,6 @@
 import './styles.css';
 import {
+  bindSegmented,
   byId,
   clear,
   fillSelect,
@@ -9,254 +10,492 @@ import {
   showNotice,
 } from '../../ui-kit/kit.ts';
 import type {
-  CollectionInfo,
+  LinkPlan,
+  LinkRequest,
+  ModeAssignment,
+  ModeInfo,
+  Operation,
   Outcome,
   PluginMessage,
-  Preview,
-  Side,
+  SourceCollection,
+  TargetCollection,
   UiMessage,
+  UnlinkPlan,
+  UnlinkRequest,
 } from '../messages.ts';
 
 const el = {
-  matchCount: byId('matchCount'),
+  meta: byId('headerMeta'),
+  operationSwitch: byId('operationSwitch'),
+  emptyView: byId('emptyView'),
+  mainView: byId('mainView'),
+  sourceGroupBox: byId('sourceGroupBox'),
   sourceCollection: byId<HTMLSelectElement>('sourceCollection'),
-  sourceGroup: byId<HTMLSelectElement>('sourceGroup'),
+  libraryHint: byId('libraryHint'),
   targetCollection: byId<HTMLSelectElement>('targetCollection'),
   targetGroup: byId<HTMLSelectElement>('targetGroup'),
-  mode: byId<HTMLSelectElement>('mode'),
+  modeBox: byId('modeBox'),
+  modeLabel: byId('modeLabel'),
+  modeCount: byId('modeCount'),
+  modeRows: byId('modeRows'),
+  modeHint: byId('modeHint'),
   previewBody: byId('previewBody'),
+  toggleAll: byId<HTMLButtonElement>('toggleAll'),
   noticeGroup: byId('noticeGroup'),
   notice: byId('notice'),
-  create: byId<HTMLButtonElement>('create'),
-  remove: byId<HTMLButtonElement>('remove'),
+  apply: byId<HTMLButtonElement>('apply'),
 };
 
-let collections: CollectionInfo[] = [];
-let preview: Preview | null = null;
+let operation: Operation = 'link';
+let sources: SourceCollection[] = [];
+let targets: TargetCollection[] = [];
+let sourceGroups: string[] = [];
+let linkPlan: LinkPlan | null = null;
+let unlinkPlan: UnlinkPlan | null = null;
+
+/* Which pair keys are ticked. Absent means ticked, so a fresh plan starts fully selected. */
+const unticked = new Set<string>();
 
 function send(message: UiMessage): void {
   postToPlugin(message);
 }
 
-function collectionOption(collection: CollectionInfo): { value: string; label: string } {
-  return { value: collection.id, label: collection.name };
+function currentSource(): SourceCollection | undefined {
+  return sources.find((s) => `${s.kind}:${s.ref}` === el.sourceCollection.value);
 }
 
-function aliasSelection(): {
-  sourceCollectionId: string;
-  sourceGroup: string;
-  targetCollectionId: string;
-  targetGroup: string;
-  modeId: string;
-} | null {
-  const sourceCollectionId = el.sourceCollection.value;
-  const sourceGroup = el.sourceGroup.value;
-  const targetCollectionId = el.targetCollection.value;
-  const targetGroup = el.targetGroup.value;
-  const modeId = el.mode.value;
-  if (!sourceCollectionId || !sourceGroup || !targetCollectionId || !targetGroup || !modeId) {
-    return null;
+function currentTarget(): TargetCollection | undefined {
+  return targets.find((t) => t.id === el.targetCollection.value);
+}
+
+function targetModes(): ModeInfo[] {
+  return currentTarget()?.modes ?? [];
+}
+
+function hint(text: string): HTMLElement {
+  const p = document.createElement('p');
+  p.className = 'fig-hint';
+  p.textContent = text;
+  return p;
+}
+
+// ── mode rows ──
+
+function modeSelect(mode: ModeInfo): HTMLSelectElement {
+  const select = document.createElement('select');
+  select.className = 'fig-select';
+  select.dataset.modeId = mode.id;
+  select.setAttribute('aria-label', `Source group for mode ${mode.name}`);
+  fillSelect(
+    select,
+    'Skip this mode',
+    sourceGroups.map((group) => ({ value: group, label: group })),
+  );
+  select.addEventListener('change', requestPlan);
+  return select;
+}
+
+function modeCheckbox(mode: ModeInfo): HTMLElement {
+  const label = document.createElement('label');
+  label.className = 'fig-check';
+  label.innerHTML =
+    `<input type="checkbox" data-mode-id="${mode.id}" checked />` +
+    '<span class="fig-check__box" aria-hidden="true">' +
+    '<svg viewBox="0 0 10 10" fill="none"><path d="M2 5.5 4 7.5 8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '</span>';
+  label.append(document.createTextNode(mode.name));
+  label.querySelector('input')?.addEventListener('change', requestPlan);
+  return label;
+}
+
+function renderModeRows(): void {
+  clear(el.modeRows);
+  const modes = targetModes();
+
+  if (modes.length === 0) {
+    el.modeRows.appendChild(hint('Pick a target collection first.'));
+    return;
   }
-  return { sourceCollectionId, sourceGroup, targetCollectionId, targetGroup, modeId };
+
+  for (const mode of modes) {
+    if (operation === 'link') {
+      const row = document.createElement('div');
+      row.className = 'mode-row';
+      const name = document.createElement('span');
+      name.className = 'mode-row__name';
+      name.textContent = mode.name;
+      name.title = mode.name;
+      row.append(name, modeSelect(mode));
+      el.modeRows.appendChild(row);
+    } else {
+      el.modeRows.appendChild(modeCheckbox(mode));
+    }
+  }
 }
 
-function canRemove(): boolean {
-  return Boolean(el.targetCollection.value && el.targetGroup.value && el.mode.value);
+function assignments(): ModeAssignment[] {
+  return [...el.modeRows.querySelectorAll<HTMLSelectElement>('select[data-mode-id]')]
+    .filter((select) => select.value !== '')
+    .map((select) => ({ modeId: select.dataset.modeId ?? '', sourceGroup: select.value }));
 }
 
-function syncButtons(): void {
-  el.create.disabled = aliasSelection() === null || (preview?.matched.length ?? 0) === 0;
-  el.remove.disabled = !canRemove();
+function checkedModeIds(): string[] {
+  return [...el.modeRows.querySelectorAll<HTMLInputElement>('input[data-mode-id]')]
+    .filter((input) => input.checked)
+    .map((input) => input.dataset.modeId ?? '');
 }
 
-function names(count: number): string {
-  return count === 1 ? '1 name has' : `${count} names have`;
+// ── requests ──
+
+function linkRequest(): LinkRequest | null {
+  const source = currentSource();
+  const target = currentTarget();
+  const group = el.targetGroup.value;
+  const assigned = assignments();
+  if (!source || !target || !group || assigned.length === 0) return null;
+  return {
+    source,
+    targetCollectionId: target.id,
+    targetGroup: group,
+    assignments: assigned,
+  };
 }
 
-function renderWarning(text: string): HTMLElement {
-  const line = document.createElement('p');
-  line.className = 'fig-hint';
-  line.textContent = text;
-  return line;
+function unlinkRequest(): UnlinkRequest | null {
+  const target = currentTarget();
+  const group = el.targetGroup.value;
+  const modeIds = checkedModeIds();
+  if (!target || !group || modeIds.length === 0) return null;
+  return { targetCollectionId: target.id, targetGroup: group, modeIds };
+}
+
+function requestPlan(): void {
+  linkPlan = null;
+  unlinkPlan = null;
+  unticked.clear();
+
+  if (operation === 'link') {
+    const request = linkRequest();
+    if (request) send({ type: 'plan-link', request });
+    else renderPreview();
+    return;
+  }
+
+  const request = unlinkRequest();
+  if (request) send({ type: 'plan-unlink', request });
+  else renderPreview();
+}
+
+// ── preview ──
+
+function pairRow(key: string, left: string, right: string): HTMLElement {
+  const row = document.createElement('label');
+  row.className = 'pair';
+
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.className = 'pair__box';
+  box.checked = !unticked.has(key);
+  box.addEventListener('change', () => {
+    if (box.checked) unticked.delete(key);
+    else unticked.add(key);
+    syncApply();
+  });
+
+  const leaf = document.createElement('span');
+  leaf.className = 'pair__leaf';
+  leaf.textContent = left;
+  leaf.title = left;
+
+  const arrow = document.createElement('span');
+  arrow.className = 'pair__arrow';
+  arrow.textContent = '→';
+
+  const target = document.createElement('span');
+  target.className = 'pair__target';
+  target.textContent = right;
+  target.title = right;
+
+  row.append(box, leaf, arrow, target);
+  return row;
+}
+
+function modeHeading(text: string, count: string): HTMLElement {
+  const head = document.createElement('div');
+  head.className = 'mode-head';
+  const name = document.createElement('span');
+  name.textContent = text;
+  const meta = document.createElement('span');
+  meta.className = 'mode-head__meta';
+  meta.textContent = count;
+  head.append(name, meta);
+  return head;
+}
+
+function renderLinkPreview(plan: LinkPlan): number {
+  let total = 0;
+
+  for (const mode of plan.modes) {
+    el.previewBody.appendChild(
+      modeHeading(`${mode.modeName} ← ${mode.sourceGroup}`, `${mode.matched.length} pairs`),
+    );
+
+    if (mode.matched.length === 0) {
+      el.previewBody.appendChild(hint('No names match between these two groups.'));
+    } else {
+      const list = document.createElement('div');
+      list.className = 'pair-list';
+      for (const pair of mode.matched) {
+        list.appendChild(pairRow(pair.key, pair.leaf, pair.targetName));
+      }
+      el.previewBody.appendChild(list);
+      total += mode.matched.length;
+    }
+
+    const warnings: string[] = [];
+    if (mode.missingInTarget.length > 0) {
+      warnings.push(`${mode.missingInTarget.length} source names have no counterpart.`);
+    }
+    if (mode.missingInSource.length > 0) {
+      warnings.push(`${mode.missingInSource.length} target names have no counterpart.`);
+    }
+    if (mode.typeMismatch.length > 0) {
+      warnings.push(`${mode.typeMismatch.length} pairs differ in value type and stay untouched.`);
+    }
+    for (const warning of warnings) el.previewBody.appendChild(hint(warning));
+  }
+
+  return total;
+}
+
+function renderUnlinkPreview(plan: UnlinkPlan): number {
+  let total = 0;
+
+  for (const mode of plan.modes) {
+    el.previewBody.appendChild(modeHeading(mode.modeName, `${mode.aliased.length} aliased`));
+
+    if (mode.aliased.length === 0) {
+      el.previewBody.appendChild(hint('Nothing in this group is aliased in this mode.'));
+      continue;
+    }
+
+    const list = document.createElement('div');
+    list.className = 'pair-list';
+    for (const entry of mode.aliased) {
+      list.appendChild(pairRow(entry.key, entry.leaf, entry.pointsAt));
+    }
+    el.previewBody.appendChild(list);
+    total += mode.aliased.length;
+
+    if (mode.plain > 0) {
+      el.previewBody.appendChild(hint(`${mode.plain} already hold a concrete value.`));
+    }
+  }
+
+  return total;
 }
 
 function renderPreview(): void {
   clear(el.previewBody);
-  el.matchCount.textContent = '';
+  const plan = operation === 'link' ? linkPlan : unlinkPlan;
 
-  if (!preview) {
-    el.previewBody.appendChild(renderWarning('Pick a source group and a target group.'));
-    syncButtons();
+  if (!plan) {
+    el.previewBody.appendChild(
+      hint(
+        operation === 'link'
+          ? 'Pick a target group, then a source group per mode.'
+          : 'Pick a target group and at least one mode.',
+      ),
+    );
+    setVisible(el.toggleAll, false);
+    syncApply();
     return;
   }
 
-  const { matched, missingInTarget, missingInSource, typeMismatch } = preview;
-  el.matchCount.textContent = matched.length > 0 ? `${matched.length} pairs` : '';
+  const total =
+    operation === 'link'
+      ? renderLinkPreview(plan as LinkPlan)
+      : renderUnlinkPreview(plan as UnlinkPlan);
 
-  if (matched.length === 0) {
-    el.previewBody.appendChild(
-      renderWarning('No variable names match between these two groups. Nothing would be linked.'),
-    );
-  } else {
-    const list = document.createElement('div');
-    list.className = 'pair-list';
-    for (const pair of matched) {
-      const row = document.createElement('div');
-      row.className = 'pair';
-
-      const leaf = document.createElement('span');
-      leaf.className = 'pair__leaf';
-      leaf.textContent = pair.leaf;
-
-      const arrow = document.createElement('span');
-      arrow.className = 'pair__arrow';
-      arrow.textContent = '→';
-      arrow.setAttribute('aria-label', 'aliases to');
-
-      const target = document.createElement('span');
-      target.className = 'pair__target';
-      target.textContent = pair.targetName;
-      target.title = pair.targetName;
-
-      row.append(leaf, arrow, target);
-      list.appendChild(row);
-    }
-    el.previewBody.appendChild(list);
-  }
-
-  const warnings: string[] = [];
-  if (missingInTarget.length > 0) {
-    warnings.push(`${names(missingInTarget.length)} no counterpart in the target group.`);
-  }
-  if (missingInSource.length > 0) {
-    warnings.push(`${names(missingInSource.length)} no counterpart in the source group.`);
-  }
-  if (typeMismatch.length > 0) {
-    const verb = typeMismatch.length === 1 ? 'pair has' : 'pairs have';
-    warnings.push(`${typeMismatch.length} ${verb} different value types and stay untouched.`);
-  }
-
-  if (warnings.length > 0) {
-    const box = document.createElement('div');
-    box.className = 'warn-list';
-    for (const warning of warnings) box.appendChild(renderWarning(warning));
-    el.previewBody.appendChild(box);
-  }
-
-  syncButtons();
+  setVisible(el.toggleAll, total > 0);
+  syncApply();
 }
 
-function requestPreview(): void {
-  const selection = aliasSelection();
-  preview = null;
-  if (selection) send({ type: 'preview', selection });
-  else renderPreview();
+function allKeys(): string[] {
+  if (operation === 'link') {
+    return (linkPlan?.modes ?? []).flatMap((mode) => mode.matched.map((pair) => pair.key));
+  }
+  return (unlinkPlan?.modes ?? []).flatMap((mode) => mode.aliased.map((entry) => entry.key));
 }
 
-function syncModes(): void {
-  const collection = collections.find((entry) => entry.id === el.targetCollection.value);
-  const modes = collection?.modes ?? [];
-  fillSelect(
-    el.mode,
-    modes.length === 0 ? 'Select a collection first' : 'Select a mode',
-    modes.map((mode) => ({ value: mode.id, label: mode.name })),
-  );
-  el.mode.disabled = modes.length === 0;
-  if (collection && modes.length === 1) el.mode.value = collection.modes[0]?.id ?? '';
+function selectedKeys(): string[] {
+  return allKeys().filter((key) => !unticked.has(key));
 }
 
-function bindCollection(
-  select: HTMLSelectElement,
-  groupSelect: HTMLSelectElement,
-  side: Side,
-): void {
-  select.addEventListener('change', () => {
-    fillSelect(groupSelect, 'Loading groups', []);
-    groupSelect.disabled = true;
-    if (side === 'target') syncModes();
-    if (select.value) send({ type: 'load-groups', side, collectionId: select.value });
-    else fillSelect(groupSelect, 'Select a group', []);
-    requestPreview();
-  });
+function syncApply(): void {
+  const selected = selectedKeys().length;
+  const request = operation === 'link' ? linkRequest() : unlinkRequest();
+  el.apply.disabled = request === null || selected === 0;
+  el.apply.textContent =
+    operation === 'link'
+      ? selected > 0
+        ? `Create ${selected} aliases`
+        : 'Create aliases'
+      : selected > 0
+        ? `Unlink ${selected} variables`
+        : 'Unlink variables';
+  el.meta.textContent = selected > 0 ? `${selected} selected` : '';
+  el.toggleAll.textContent = selected > 0 ? 'Deselect all' : 'Select all';
 }
 
-function describe(outcome: Outcome, verb: 'linked' | 'unlinked'): string {
+// ── wiring ──
+
+const selectOperation = bindSegmented(el.operationSwitch, (value) => {
+  operation = value as Operation;
+  setVisible(el.sourceGroupBox, operation === 'link');
+  el.modeLabel.textContent = operation === 'link' ? 'Source group per mode' : 'Modes';
+  el.modeHint.textContent =
+    operation === 'link'
+      ? 'A mode left on Skip is not written. One mode at a time still works.'
+      : 'Aliases are replaced by the concrete value they resolve to.';
+  renderModeRows();
+  requestPlan();
+});
+
+el.sourceCollection.addEventListener('change', () => {
+  sourceGroups = [];
+  renderModeRows();
+  const source = currentSource();
+  if (source) send({ type: 'load-source-groups', source });
+  requestPlan();
+});
+
+el.targetCollection.addEventListener('change', () => {
+  fillSelect(el.targetGroup, 'Loading groups', []);
+  el.targetGroup.disabled = true;
+  renderModeRows();
+  if (el.targetCollection.value) {
+    send({ type: 'load-target-groups', collectionId: el.targetCollection.value });
+  }
+  requestPlan();
+});
+
+el.targetGroup.addEventListener('change', requestPlan);
+
+el.toggleAll.addEventListener('click', () => {
+  if (selectedKeys().length > 0) for (const key of allKeys()) unticked.add(key);
+  else unticked.clear();
+  renderPreview();
+});
+
+el.apply.addEventListener('click', () => {
+  const keys = selectedKeys();
+  if (keys.length === 0) return;
+  el.apply.disabled = true;
+
+  if (operation === 'link') {
+    const request = linkRequest();
+    if (request) send({ type: 'apply-link', request, keys });
+    return;
+  }
+  const request = unlinkRequest();
+  if (request) send({ type: 'apply-unlink', request, keys });
+});
+
+function describe(outcome: Outcome, done: Operation): string {
+  const verb = done === 'link' ? 'linked' : 'unlinked';
   const parts = [`${outcome.applied} ${verb}`];
   if (outcome.skipped > 0) parts.push(`${outcome.skipped} skipped`);
   if (outcome.failed > 0) parts.push(`${outcome.failed} failed`);
   return parts.join(', ');
 }
 
-bindCollection(el.sourceCollection, el.sourceGroup, 'source');
-bindCollection(el.targetCollection, el.targetGroup, 'target');
-
-for (const select of [el.sourceGroup, el.targetGroup]) {
-  select.addEventListener('change', requestPreview);
-}
-el.mode.addEventListener('change', syncButtons);
-
-el.create.addEventListener('click', () => {
-  const selection = aliasSelection();
-  if (!selection) return;
-  el.create.disabled = true;
-  send({ type: 'create', selection });
-});
-
-el.remove.addEventListener('click', () => {
-  if (!canRemove()) return;
-  el.remove.disabled = true;
-  send({
-    type: 'remove',
-    selection: {
-      targetCollectionId: el.targetCollection.value,
-      targetGroup: el.targetGroup.value,
-      modeId: el.mode.value,
-    },
-  });
-});
-
 onPluginMessage<PluginMessage>((message) => {
   switch (message.type) {
-    case 'collections': {
-      collections = message.collections;
-      const options = collections.map(collectionOption);
-      const placeholder = collections.length === 0 ? 'No collections yet' : 'Select a collection';
-      fillSelect(el.sourceCollection, placeholder, options);
-      fillSelect(el.targetCollection, placeholder, options);
-      syncModes();
+    case 'sources': {
+      sources = message.sources;
+      targets = message.targets;
+
+      setVisible(el.mainView, targets.length > 0);
+      setVisible(el.emptyView, targets.length === 0);
+
+      fillSelect(
+        el.sourceCollection,
+        sources.length === 0 ? 'No collections available' : 'Select a source',
+        sources.map((s) => ({
+          value: `${s.kind}:${s.ref}`,
+          label: s.libraryName === null ? s.name : `${s.libraryName} · ${s.name}`,
+        })),
+      );
+      fillSelect(
+        el.targetCollection,
+        targets.length === 0 ? 'No collections in this file' : 'Select a target',
+        targets.map((t) => ({ value: t.id, label: t.name })),
+      );
+
+      const libraries = sources.filter((s) => s.kind === 'library').length;
+      el.libraryHint.textContent =
+        message.libraryError !== null
+          ? `Libraries could not be read: ${message.libraryError}`
+          : libraries === 0
+            ? 'No library collections found. Enable a library in this file to alias to it.'
+            : `${libraries} library ${libraries === 1 ? 'collection' : 'collections'} available.`;
+      setVisible(el.libraryHint, true);
+
+      renderModeRows();
       renderPreview();
       return;
     }
-    case 'groups': {
-      const select = message.side === 'source' ? el.sourceGroup : el.targetGroup;
+
+    case 'source-groups':
+      sourceGroups = message.groups;
+      renderModeRows();
+      requestPlan();
+      return;
+
+    case 'target-groups':
       fillSelect(
-        select,
-        message.groups.length === 0 ? 'No groups in this collection' : 'Select a group',
+        el.targetGroup,
+        message.groups.length === 0 ? 'No groups in this collection' : 'Select a target group',
         message.groups.map((group) => ({ value: group, label: group })),
       );
-      select.disabled = message.groups.length === 0;
-      requestPreview();
+      el.targetGroup.disabled = message.groups.length === 0;
+      renderModeRows();
+      requestPlan();
       return;
-    }
-    case 'preview':
-      preview = message.preview;
+
+    case 'link-plan':
+      linkPlan = message.plan;
+      el.modeCount.textContent = `${message.plan.modes.length} assigned`;
       renderPreview();
       return;
+
+    case 'unlink-plan':
+      unlinkPlan = message.plan;
+      renderPreview();
+      return;
+
     case 'done':
       setVisible(el.noticeGroup, true);
       showNotice(
         el.notice,
         message.outcome.failed > 0 ? 'error' : 'success',
-        describe(message.outcome, message.verb),
+        describe(message.outcome, message.operation),
       );
-      requestPreview();
+      requestPlan();
       return;
+
     case 'error':
       setVisible(el.noticeGroup, true);
       showNotice(el.notice, 'error', message.message);
-      syncButtons();
+      syncApply();
       return;
   }
 });
 
+selectOperation('link');
+setVisible(el.sourceGroupBox, true);
+el.modeLabel.textContent = 'Source group per mode';
+el.modeHint.textContent = 'A mode left on Skip is not written. One mode at a time still works.';
+renderModeRows();
 renderPreview();

@@ -1,10 +1,22 @@
-import type { MatchedPair, Preview } from './messages.ts';
-
 /* Structural subset of Variable, so the matching logic stays testable without the Figma API. */
 export interface Pairable {
   readonly id: string;
   readonly name: string;
   readonly resolvedType: string;
+}
+
+export interface MatchedPair {
+  key: string;
+  leaf: string;
+  sourceName: string;
+  targetName: string;
+}
+
+export interface Match {
+  matched: MatchedPair[];
+  missingInTarget: string[];
+  missingInSource: string[];
+  typeMismatch: string[];
 }
 
 export function groupOf(variableName: string): string {
@@ -25,14 +37,23 @@ export function byLeaf<T extends Pairable>(variables: readonly T[], group: strin
   return result;
 }
 
+export function groupsOf(variables: readonly Pairable[]): string[] {
+  const groups = new Set(variables.map((variable) => groupOf(variable.name)));
+  groups.delete('');
+  return [...groups].sort((a, b) => a.localeCompare(b));
+}
+
 /**
  * Pairs two groups on the leaf name. Never on collection order: two groups can hold the same
  * variables in a different order, and index based pairing silently produced wrong aliases.
+ *
+ * `keyOf` builds the identity the UI uses for its per pair checkboxes.
  */
 export function match(
   source: ReadonlyMap<string, Pairable>,
   target: ReadonlyMap<string, Pairable>,
-): Preview {
+  keyOf: (leaf: string) => string,
+): Match {
   const matched: MatchedPair[] = [];
   const missingInTarget: string[] = [];
   const typeMismatch: string[] = [];
@@ -48,7 +69,12 @@ export function match(
       typeMismatch.push(leaf);
       continue;
     }
-    matched.push({ leaf, sourceName: sourceVariable.name, targetName: targetVariable.name });
+    matched.push({
+      key: keyOf(leaf),
+      leaf,
+      sourceName: sourceVariable.name,
+      targetName: targetVariable.name,
+    });
   }
 
   const missingInSource = [...target.keys()].filter((leaf) => !source.has(leaf));
@@ -60,10 +86,4 @@ export function match(
     missingInSource: missingInSource.sort(alpha),
     typeMismatch: typeMismatch.sort(alpha),
   };
-}
-
-export function groupsOf(variables: readonly Pairable[]): string[] {
-  const groups = new Set(variables.map((variable) => groupOf(variable.name)));
-  groups.delete('');
-  return [...groups].sort((a, b) => a.localeCompare(b));
 }

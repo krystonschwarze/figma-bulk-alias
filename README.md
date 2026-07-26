@@ -10,16 +10,41 @@ groups on the canvas.
 
 ## What it does
 
-Pick a source group, a target group and the target mode. Every target variable whose name matches a
-source variable gets an alias pointing at it.
+Two operations, switched at the top of the window.
 
-Matching is by **name**, not by position. Two groups can hold the same variables in a different
-order, so the preview lists exactly which pairs will be written before anything happens. Names
-without a counterpart, and pairs whose value types differ, are reported and left untouched.
+**Link** points target variables at source variables. Pick a source collection, a target collection
+and a target group, then assign a source group **per target mode**. Every target variable whose name
+matches a source variable gets an alias.
 
-**Remove aliases** writes a concrete value back into every aliased variable of the target group. The
-value is read from the source collection's own default mode, and alias chains are followed to their
-end, because mode ids are not shared between collections.
+The per mode assignment is the common design system shape:
+
+```
+Primitives (1 mode)                Semantic (2 modes)
+├─ color/light/01..n               └─ color/surface/01..n
+└─ color/dark/01..n
+
+Light  ←  color/light
+Dark   ←  color/dark          one pass, two modes written
+```
+
+A mode left on **Skip this mode** is not written, so working one mode at a time still works exactly
+as before.
+
+**The source may live in an enabled library.** Local and library collections appear in the same
+picker, library entries prefixed with the library name. Library variables are read as descriptors for
+the preview, which costs no imports, and only the pairs you actually apply are pulled in with
+`importVariableByKeyAsync`. Targets are always local, because a plugin cannot write variables into
+someone else's library. A library has to be enabled in the file through the Figma UI first, no plugin
+can do that.
+
+**Unlink** replaces an alias with the concrete value it resolves to. The value is read from the source
+collection's own default mode, and alias chains are followed to their end, because mode ids are not
+shared between collections.
+
+**Both operations preview before they write, and every row has a checkbox.** Matching is by name, not
+by position, so two groups holding the same variables in a different order still pair correctly. Names
+without a counterpart, and pairs whose value types differ, are reported and left alone. The write path
+runs through the same matching function the preview uses, so the two cannot disagree.
 
 ## Development
 
@@ -40,6 +65,7 @@ Import the plugin in Figma via **Plugins > Development > Import plugin from mani
 | ----------------- | ---------------------------------------------------------------- |
 | `src/code.ts`     | Sandbox side. Matching, aliasing and unlinking.                  |
 | `src/pairing.ts`  | Group matching by leaf name. Pure, unit tested.                  |
+| `src/sources.ts`  | Local and library collections behind one interface.              |
 | `src/messages.ts` | Message contract shared by both sides.                           |
 | `src/ui/`         | Plugin window. `index.html` is a template, the build inlines it. |
 | `ui-kit/`         | Shared design system. Synced copy, do not edit here.             |
